@@ -5,13 +5,17 @@ Made for educational purpose, for preventing people from getting attacked by thi
 
 ## Example usages
 
-### Use https://crafty.gg as an IP logger
+> Use https://crafty.gg as an IP logger
+
+Fix: Accept only favicon that starts with `png,base64...`
 
 - `https://crafty.gg/tools/ping?ip=YOUR_IP&port=YOUR_PORT&platform=java`
 
 - `./pwncraft localhost 1337 -f 'https://CANARY/'`
 
-### XSS on https://minecraft-api.com
+> XSS on https://minecraft-api.com
+
+Fix: HTML escape data from server
 
 - `https://minecraft-api.com/api/ping/YOUR_IP/YOUR_PORT`
 
