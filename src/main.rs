@@ -1,11 +1,14 @@
 use clap::Parser;
-
+mod packet;
 mod server;
 
 #[derive(clap::Parser)]
 struct Arguments {
     host: String,
     port: u16,
+
+    #[arg(short, long, default_value_t = 47)]
+    protocol: isize,
 
     #[arg(short, long, default_value_t = String::from("Hello, world!"))]
     description: String,
@@ -35,6 +38,7 @@ twitter.com/t0x00ast
     server::Server::new(
         &args.host,
         args.port,
+        args.protocol,
         &args.description,
         &args.favicon,
         &args.version,

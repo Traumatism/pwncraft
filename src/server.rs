@@ -1,5 +1,6 @@
 use std::error::Error;
-use std::io::Cursor;
+
+use crate::packet::{build_packet, to_varint};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -10,43 +11,29 @@ use tokio::{
 pub struct Server {
     host: String,
     port: u16,
+    protocol: isize,
     description: String,
     favicon: String,
     version: String,
 }
 
 impl Server {
-    pub fn new(host: &str, port: u16, description: &str, favicon: &str, version: &str) -> Self {
+    pub fn new(
+        host: &str,
+        port: u16,
+        protocol: isize,
+        description: &str,
+        favicon: &str,
+        version: &str,
+    ) -> Self {
         Self {
             host: String::from(host),
             port,
+            protocol,
             description: String::from(description),
             favicon: String::from(favicon),
             version: String::from(version),
         }
-    }
-
-    /// Convert an integer to varint bytes
-    fn to_varint(&self, int: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-        let mut int = (int as u64) & 0xFFFF_FFFF;
-        let mut written = 0;
-        let mut buffer = [0; 5];
-
-        loop {
-            let temp = (int & 0b0111_1111) as u8;
-            int >>= 7;
-            if int != 0 {
-                buffer[written] = temp | 0b1000_0000;
-            } else {
-                buffer[written] = temp;
-            }
-            written += 1;
-            if int == 0 {
-                break;
-            }
-        }
-
-        Ok(buffer[0..written].to_vec())
     }
 
     /// Read a varint value from a TcpStream
@@ -92,30 +79,23 @@ impl Server {
             return Ok(());
         }
 
-        let payload = format!("{{\"version\": {{\"name\": \"{}\", \"protocol\": 47}}, \"players\": {{\"max\": 1, \"online\": 0}}, \"favicon\": \"{}\", \"description\": {{\"text\": \"{}\"}}}}", self.version, self.favicon, self.description);
+        let packet = build_packet(
+            self.protocol,
+            &self.description,
+            &self.version,
+            &self.favicon,
+        )
+        .await?;
 
-        let mut packet = Cursor::new(Vec::<u8>::new());
-
-        // Packet ID (0x00)
-        packet.write_all(self.to_varint(0)?.as_slice()).await?;
-
-        // Payload length
-        packet
-            .write_all(self.to_varint(payload.len())?.as_slice())
-            .await?;
-
-        // Payload
-        packet.write_all(payload.as_bytes()).await?;
-
-        println!("[~] Sending packet...");
+        println!("[~] Sending reponse packet ({} bytes)...", packet.len());
 
         // Packet length
         stream
-            .write_all(self.to_varint(packet.get_ref().len())?.as_slice())
+            .write_all(to_varint(packet.len())?.as_slice())
             .await?;
 
         // Packet
-        stream.write_all(packet.get_ref()).await?;
+        stream.write_all(packet.as_slice()).await?;
 
         println!("[+] Response packet written.");
 
