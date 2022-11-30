@@ -27,7 +27,7 @@ impl Server {
     }
 
     /// Convert an integer to varint bytes
-    async fn to_varint(&self, int: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    fn to_varint(&self, int: usize) -> Result<Vec<u8>, Box<dyn Error>> {
         let mut int = (int as u64) & 0xFFFF_FFFF;
         let mut written = 0;
         let mut buffer = [0; 5];
@@ -93,13 +93,11 @@ impl Server {
         let mut packet = Cursor::new(Vec::<u8>::new());
 
         // Packet ID (0x00)
-        packet
-            .write_all(self.to_varint(0).await?.as_slice())
-            .await?;
+        packet.write_all(self.to_varint(0)?.as_slice()).await?;
 
         // Payload length
         packet
-            .write_all(self.to_varint(payload.len()).await?.as_slice())
+            .write_all(self.to_varint(payload.len())?.as_slice())
             .await?;
 
         // Payload
@@ -109,7 +107,7 @@ impl Server {
 
         // Packet length
         stream
-            .write_all(self.to_varint(packet.get_ref().len()).await?.as_slice())
+            .write_all(self.to_varint(packet.get_ref().len())?.as_slice())
             .await?;
 
         // Packet

