@@ -78,12 +78,16 @@ impl Server {
 
     /// Handle new victim
     async fn handle(&mut self, stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
-        let mut buffer = vec![0; self.read_varint_from_socket(stream).await?];
+        let mut incoming_packet = vec![0; self.read_varint_from_socket(stream).await?];
 
-        stream.read_exact(&mut buffer).await?;
+        stream.read_exact(&mut incoming_packet).await?;
 
         // Any SLP request packet should start with 0x00 and end with 0x1
-        if (buffer.first().unwrap(), buffer.last().unwrap()) != (&0x0, &0x1) {
+        if (
+            incoming_packet.first().unwrap(), // Packet ID
+            incoming_packet.last().unwrap(),  // Next state
+        ) != (&0x0, &0x1)
+        {
             println!("[-] Received packet was apparently not a SLP packet.");
             return Ok(());
         }
