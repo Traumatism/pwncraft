@@ -1,9 +1,7 @@
-use std::error::Error;
-
-use crate::packet::{build_packet, to_varint};
+use crate::packet::{build_packet, to_varint, CONTINUE_BITS, SEG_BITS};
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt, Result},
     net::{TcpListener, TcpStream},
 };
 
@@ -37,17 +35,13 @@ impl Server {
     }
 
     /// Read a varint value from a TcpStream
-    async fn read_varint_from_socket(
-        &mut self,
-        stream: &mut TcpStream,
-    ) -> Result<usize, Box<dyn std::error::Error>> {
+    async fn read_varint_from_socket(&mut self, stream: &mut TcpStream) -> Result<usize> {
         let mut read = 0;
         let mut output = 0;
 
         loop {
             let read_value = stream.read_u8().await?;
-
-            let value = read_value & 0b0111_1111;
+            let value = read_value & CONTINUE_BITS as u8;
 
             output |= (value as usize) << (7 * read);
 
@@ -57,14 +51,14 @@ impl Server {
                 panic!(); // varint size should be 5
             }
 
-            if (read_value & 0b1000_0000) == 0 {
+            if (read_value & SEG_BITS as u8) == 0 {
                 return Ok(output);
             }
         }
     }
 
     /// Handle new victim
-    async fn handle(&mut self, stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
+    async fn handle(&mut self, stream: &mut TcpStream) -> Result<()> {
         let mut incoming_packet = vec![0; self.read_varint_from_socket(stream).await?];
 
         stream.read_exact(&mut incoming_packet).await?;
@@ -84,8 +78,7 @@ impl Server {
             &self.description,
             &self.version,
             &self.favicon,
-        )
-        .await?;
+        )?;
 
         println!("[~] Sending reponse packet ({} bytes)...", packet.len());
 
@@ -103,7 +96,7 @@ impl Server {
     }
 
     /// Run the server
-    pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn run(&mut self) -> Result<()> {
         let addr = format!("{}:{}", self.host, self.port);
         let listener = TcpListener::bind(&addr).await?;
 

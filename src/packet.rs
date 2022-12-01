@@ -1,22 +1,30 @@
-use std::error::Error;
-use std::io::Cursor;
-use tokio::io::AsyncWriteExt;
+use tokio::io::Result;
+
+pub const CONTINUE_BITS: u64 = 0x7F;
+pub const SEG_BITS: u64 = 0x80;
 
 /// Convert an integer to varint bytes
-pub fn to_varint(int: usize) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut int = (int as u64) & 0xFFFF_FFFF;
+pub fn to_varint(int: usize) -> Result<Vec<u8>> {
+    let mut buffer = [0; 5]; // varint size is 5 bytes
     let mut written = 0;
-    let mut buffer = [0; 5];
+
+    let mut int = (int as u64) & 0xFFFF_FFFF; // 2^32
 
     loop {
-        let temp = (int & 0b0111_1111) as u8;
+        let temp = (int & CONTINUE_BITS) as u8;
+
         int >>= 7;
-        if int != 0 {
-            buffer[written] = temp | 0b1000_0000;
-        } else {
-            buffer[written] = temp;
-        }
+
+        buffer[written] = {
+            if int != 0 {
+                temp | SEG_BITS as u8
+            } else {
+                temp
+            }
+        };
+
         written += 1;
+
         if int == 0 {
             break;
         }
@@ -25,26 +33,40 @@ pub fn to_varint(int: usize) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(buffer[0..written].to_vec())
 }
 
-pub async fn build_packet(
+/// Craft the SLP packet
+///
+/// See:
+///     - wiki.vg/Server_List_Ping
+///     - wiki.vg/Protocol
+///
+pub fn build_packet(
     protocol: isize,
     description: &str,
     version: &str,
     favicon: &str,
-) -> Result<Vec<u8>, Box<dyn Error>> {
-    let payload = format!("{{\"version\": {{\"name\": \"{}\", \"protocol\": {}}}, \"players\": {{\"max\": 1, \"online\": 0}}, \"favicon\": \"{}\", \"description\": {{\"text\": \"{}\"}}}}", version, protocol, favicon, description);
+) -> Result<Vec<u8>> {
+    let payload = format!(
+        "{{\"version\": {{\"name\": \"{}\", \"protocol\": {}}}, \"players\": {{\"max\": 1, \"online\": 0}}, \"favicon\": \"{}\", \"description\": {{\"text\": \"{}\"}}}}",
+        version,
+        protocol,
+        favicon,
+        description
+    );
 
-    let mut packet = Cursor::new(Vec::<u8>::new());
+    if payload.len() > 32767 {
+        panic!("Payload to big")
+    }
+
+    let mut pkt = Vec::<u8>::new();
 
     // Packet ID (0x00)
-    packet.write_all(to_varint(0)?.as_slice()).await?;
+    pkt.append(&mut to_varint(0)?);
 
     // Payload length
-    packet
-        .write_all(to_varint(payload.len())?.as_slice())
-        .await?;
+    pkt.append(&mut to_varint(payload.len())?);
 
     // Payload
-    packet.write_all(payload.as_bytes()).await?;
+    pkt.append(&mut payload.as_bytes().to_vec());
 
-    Ok(packet.get_ref().clone())
+    Ok(pkt)
 }
